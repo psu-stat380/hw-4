@@ -239,10 +239,15 @@ url <- "https://web.stanford.edu/class/archive/cs/cs109/cs109.1166/stuff/titanic
 
 df <- read_csv(url)
 
-df$Sex <- as.factor(df$Sex)
-df <- rename(df, "y" = Survived)
-df$y <- as.factor(df$y)
 
+df <-
+  df %>%
+  mutate(Survived = as.factor(Survived),
+         Sex = as.factor(Sex)) %>%
+  rename("y" = Survived)
+
+names(df) <- tolower(names(df))
+  
 
 head(df)
 
@@ -255,8 +260,13 @@ head(df)
 
 Visualize the correlation matrix of all numeric columns in `df` using `corrplot()`
 
-```R
-df %>% ... # Insert your code here
+```{R}
+df %>% 
+  keep(is.numeric) %>%
+  cor() %>%
+  corrplot(type = "upper", order = "hclust")
+
+
 ```
 
 
