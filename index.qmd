@@ -285,8 +285,12 @@ Fit a logistic regression model to predict the probability of surviving the tita
 * `# parents`
 
 
-```R
-full_model <- ... # Insert your code here
+```{R}
+df <- 
+  df %>%
+  select(!name)
+
+full_model <- glm(y ~ ., df, family = binomial())
 summary(full_model)
 ```
 
@@ -295,6 +299,8 @@ summary(full_model)
 ###### 2.4 (30 points)
 
 Provide an interpretation for the slope and intercept terms estimated in `full_model` in terms of the log-odds of survival in the titanic and in terms of the odds-ratio (if the covariate is also categorical).
+
+The intercept term represents the log-odds of survival when all other variables are set to 0. The slope represents the change in log-odds with a 1 unit change in the predictor variable. The odds-ratio (if the covariate is also categorical) represents the ratio of the odds of the outcome occurring in one group compared to the odds of the outcome occurring in a different group.
 
 ::: {.callout-hint}
 ## 
@@ -326,16 +332,18 @@ Complete the following function `overview` which takes in two categorical vector
 * The false positive rate, and
 * The false negative rate
 
-```R
+```{R}
 overview <- function(predicted, expected){
-    accuracy <- ... # Insert your code here
-    error <- ... # Insert your code here
-    total_false_positives <- ... # Insert your code here
-    total_true_positives <- ... # Insert your code here
-    total_false_negatives <- ... # Insert your code here
-    total_true_negatives <- ... # Insert your code here
-    false_positive_rate <- ... # Insert your code here
-    false_negative_rate <- ... # Insert your code here
+    total_false_positives <- sum(predicted != expected & predicted == 1)
+    total_true_positives <- sum(predicted == expected & expected == 1)
+    total_false_negatives <- sum(predicted != expected & predicted == 0)
+    total_true_negatives <- sum(predicted == expected & expected == 0)
+    false_positive_rate <- total_false_positives / (total_false_positives + 
+                                                      total_true_negatives)
+    false_negative_rate <- total_false_negatives / (total_false_negatives + 
+                                                      total_true_positives)
+    accuracy <- (total_true_positives + total_true_negatives) / length(predicted)
+    error <- 1- accuracy
     return(
         data.frame(
             accuracy = accuracy, 
@@ -349,7 +357,7 @@ overview <- function(predicted, expected){
 
 You can check if your function is doing what it's supposed to do by evaluating
 
-```R
+```{R}
 overview(df$y, df$y)
 ```
 and making sure that the accuracy is $100\%$ while the errors are $0\%$.
@@ -359,8 +367,16 @@ and making sure that the accuracy is $100\%$ while the errors are $0\%$.
 
 Display an overview of the key performance metrics of `full_model`
 
-```R
-... # Insert your code here
+```{R}
+# predicting the full_model
+full_predictions = predict(full_model, type = "response")
+
+full_predictions <- ifelse(full_predictions >= 0.5, 1, 0)
+
+# setting the expected variables with the true values
+expected <- df$y
+
+overview(full_predictions, expected)
 ```
 
 ---
@@ -369,14 +385,21 @@ Display an overview of the key performance metrics of `full_model`
 
 Using backward-stepwise logistic regression, find a parsimonious altenative to `full_model`, and print its `overview`
 
-```R
-step_model <- ... # Insert your code here. 
+```{R}
+step_model <- step(full_model, direction = "backward", scope=formula(full_model))
 summary(step_model)
 ```
 
-```R
-step_predictions <- ... # Insert your code here
-overview(step_predictions, df$y)
+```{R}
+# creating the prediction variables
+step_predictions <- predict(step_model, type = "response")
+
+step_predictions <- ifelse(step_predictions >= 0.5, 1, 0)
+
+# setting the expected variables
+expected <- df$y
+
+overview(step_predictions, expected)
 ```
 
 ---
@@ -385,29 +408,40 @@ overview(step_predictions, df$y)
 
 Using the `caret` package, setup a **$5$-fold cross-validation** training method using the `caret::trainConrol()` function
 
-```R
-controls <- trainControl() # ... insert your code here
+```{R}
+controls <- trainControl(method = "cv", number = 5)
 ```
 
 Now, using `control`, perform $5$-fold cross validation using `caret::train()` to select the optimal $\lambda$ parameter for LASSO with logistic regression. 
 
+
 Take the search grid for $\lambda$ to be in $\{ 2^{-20}, 2^{-19.5}, 2^{-19}, \dots, 2^{-0.5}, 2^{0} \}$.
 
-```R
+```{R}
 # Insert your code in the ... region
 lasso_fit <- train(
-  x = ...,
-  y = ...,
-  method = ...,
+  y ~ .,
+  data = df,
+  method = "glmnet",
   trControl = controls, 
   tuneGrid = expand.grid(
-    alpha = ...,
+    alpha = 1,
     lambda = 2^seq(-20, 0, by = 0.5)
     ),
-  family = ...
+  family = "binomial"
 )
 ```
 Using the information stored in `lasso_fit$results`, plot the results for  cross-validation accuracy vs. $log_2(\lambda)$. Choose the optimal $\lambda^*$, and report your results for this value of $\lambda^*$.
+
+```{R}
+ggplot(data = lasso_fit$results, aes(x = log2(lambda), y = Accuracy)) +
+  geom_line() +
+  xlab("log_2(lambda)") +
+  ylab("Cross-Validation Accuracy")
+
+
+```
+
 
 ---
 
