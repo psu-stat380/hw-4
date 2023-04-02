@@ -243,7 +243,8 @@ df <- read_csv(url)
 df <-
   df %>%
   mutate(Survived = as.factor(Survived),
-         Sex = as.factor(Sex)) %>%
+         Sex = as.factor(Sex),
+         Pclass = as.factor(Pclass)) %>%
   rename("y" = Survived)
 
 names(df) <- tolower(names(df))
@@ -449,27 +450,29 @@ ggplot(data = lasso_fit$results, aes(x = log2(lambda), y = Accuracy)) +
 
 First, use the `model.matrix()` function to convert the covariates of `df` to a matrix format
 
-```R
+```{R}
 covariate_matrix <- model.matrix(full_model)[, -1]
 ```
 
 Now, initialize the covariates $X$ and the response $y$ as `torch` tensors
 
-```R
-X <- ... # Insert your code here
-y <- ... # Insert your code here
+```{R}
+X <- torch_tensor(covariate_matrix, dtype = torch_float()) 
+y <- torch_tensor(y, dtype = torch_float())
 ```
 
 Using the `torch` library, initialize an `nn_module` which performs logistic regression for this dataset. (Remember that we have 6 different covariates)
 
-```R
+```{R}
 logistic <- nn_module(
   initialize = function() {
-    self$f <- ... # Insert your code here
-    self$g <- ... # Insert your code here
+    self$f <- nn_linear(7, 1)
+    self$g <- nn_sigmoid()
   },
   forward = function(x) {
-    ... # Insert your code here
+  x %>%
+    self$f() %>%
+    self$g()
   }
 )
 
@@ -478,16 +481,16 @@ f <- logistic()
 
 You can verify that your code is right by checking that the output to the following code is a vector of probabilities:
 
-```R
+```{R}
 f(X)
 ```
 
 
 Now, define the loss function `Loss()` which takes in two tensors `X` and `y` and a function `Fun`, and outputs the **Binary cross Entropy loss** between `Fun(X)` and `y`. 
 
-```R
+```{R}
 Loss <- function(X, y, Fun){
-  ... # Insert our code here
+  nn_bce_loss(Fun(X), y)
 }
 ```
 
