@@ -377,7 +377,9 @@ full_predictions <- ifelse(full_predictions >= 0.5, 1, 0)
 # setting the expected variables with the true values
 expected <- df$y
 
-overview(full_predictions, expected)
+full_overview <- overview(full_predictions, expected)
+full_overview
+
 ```
 
 ---
@@ -400,7 +402,8 @@ step_predictions <- ifelse(step_predictions >= 0.5, 1, 0)
 # setting the expected variables
 expected <- df$y
 
-overview(step_predictions, expected)
+step_overview <- overview(step_predictions, expected)
+step_overview
 ```
 
 ---
@@ -458,7 +461,7 @@ Now, initialize the covariates $X$ and the response $y$ as `torch` tensors
 
 ```{R}
 X <- torch_tensor(covariate_matrix, dtype = torch_float()) 
-y <- torch_tensor(y, dtype = torch_float())
+y <- torch_tensor(df$y, dtype = torch_float())
 ```
 
 Using the `torch` library, initialize an `nn_module` which performs logistic regression for this dataset. (Remember that we have 6 different covariates)
@@ -490,34 +493,68 @@ Now, define the loss function `Loss()` which takes in two tensors `X` and `y` an
 
 ```{R}
 Loss <- function(X, y, Fun){
-  nn_bce_loss(Fun(X), y)
+  nn_bce_loss()(Fun(X), y)
 }
 ```
 
 Initialize an optimizer using `optim_adam()` and perform $n=1000$ steps of gradient descent in order to fit logistic regression using `torch`.
 
-```R
+```{R}
 f <- logistic()
-optimizer <- optim_adam(...) # Insert your code here
+optimizer <- optim_adam(f$parameters, lr = 0.0005)
 
 n <- 1000
-...  # Insert your code for gradient descent here
+
+for (i in 1:n) {
+  loss <- Loss(X, y, f)
+  
+  optimizer$zero_grad()
+  loss$backward()
+  optimizer$step()
+  
+  if(i %% 100 == 0){
+    cat(sprintf("Step %d, Loss = %.4f\n", i, loss))
+  }
+}
 ```
 
 Using the final, optimized parameters of `f`, compute the compute the predicted results on `X`
 
-```R
+```{R}
 predicted_probabilities <- f(X) %>% as_array()
-torch_predictions <- ... # Insert your code here
+torch_predictions <- ifelse(predicted_probabilities >= 0.5, 1, 0)
 
-overview(torch_predictions, df$y)
+torch_overview <- overview(torch_predictions, df$y)
+torch_overview
 ```
+
+
+```{R}
+# creating the lasso regression overview
+lasso_prediction <- predict(lasso_fit)
+
+lasso_overview <- overview(lasso_prediction, df$y)
+lasso_overview
+```
+
 
 ---
 
 ###### 3.6  (5 points)
 
 Create a summary table of the `overview()` summary statistics for each of the $4$ models we have looked at in this assignment, and comment on their relative strengths and drawbacks. 
+
+
+```{R}
+name <- c("full_overview", "step_overview", "torch_overview", "lasso_overview")
+
+all_overviews <-
+  rbind(full_overview, step_overview, torch_overview, lasso_overview) %>%
+  cbind(name) %>%
+  select(name, accuracy, error, false_positive_rate, false_negative_rate)
+all_overviews
+
+```
 
 
 :::{.hidden unless-format="pdf"}
