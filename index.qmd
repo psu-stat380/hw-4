@@ -71,7 +71,6 @@ $$
 
 $$
 \frac{d}{dx}g(x, y) = 2x - 6, \quad \frac{d}{dy}g(x, y) = 2y - 8
-
 $$
 
 Using your answer from above, what is the answer to
@@ -103,8 +102,11 @@ Yes, the answer matches exactly what was expected.
 
 ###### 1.2 (10 points)
 
+```{R}
+# command not working as intended so I put it into a comment
+# $$\newcommand{\u}{\boldsymbol{u}}\newcommand{\v}{\boldsymbol{v}}$$
+```
 
-$$\newcommand{\u}{\boldsymbol{u}}\newcommand{\v}{\boldsymbol{v}}$$
 
 Consider $h(\u, \v)$ given by
 $$
@@ -114,22 +116,22 @@ where $\u \cdot \v$ denotes the dot product of two vectors, i.e., $\u \cdot \v =
 
 Using elementary calculus derive the expressions for the gradients
 
-$$
-\begin{aligned}
-\nabla_\u h(\u, \v) &= \Bigg(\frac{d}{du_1}h(\u, \v), \frac{d}{du_2}h(\u, \v), \dots, \frac{d}{du_n}h(\u, \v)\Bigg)
-\end{aligned}
-$$
+Had to comment out because I was getting an error when rendering...
+
+<!-- $$ -->
+<!-- \begin{aligned} -->
+<!-- \nabla_\u h(\u, \v) &= \Bigg(\frac{d}{du_1}h(\u, \v), \frac{d}{du_2}h(\u, \v), \dots, \frac{d}{du_n}h(\u, \v)\Bigg) -->
+<!-- \end{aligned} -->
+<!-- $$ -->
 
 The answer is below:
 
+
 $$
-\begin{aligned}
-\frac{d}{du}\nabla_\u h(\u, \v) &= \Bigg(3(\u \cdot \v)^2 \times v_1, 3(\u \cdot \v)^2 \times v_2, \dots, 3(\u \cdot \v)^2 \times v_n\Bigg)
-\end{aligned}
+= \Bigg(3(u \cdot v)^2 \times v_1, 3(u \cdot v)^2 \times v_2, \dots, 3(u \cdot v)^2 \times v_n\Bigg)
 $$
 
-
-Using your answer from above, what is the answer to $\nabla_\u h(\u, \v)$ when $n=10$ and
+Using your answer from above, what is the answer to change in $h(\u, \v)$ when $n=10$ and
 
 $$
 \begin{aligned}
@@ -138,7 +140,7 @@ $$
 \end{aligned}
 $$
 
-The answer is 0.
+The answer is (-12, -12, -12, -12, -12, 12, 12, 12, 12, 12).
 
 Define $h(\u, \v)$ as a function in R, initialize the two vectors $\u$ and $\v$ as `torch_tensor`s. Compute the gradient of $h(\u, \v)$ with respect to $\u$. Does the answer match what you expected?
 
@@ -151,10 +153,13 @@ h <- function(u, v) {
 u <- torch_tensor(c(-1, 1, -1, 1, -1, 1, -1, 1, -1, 1), requires_grad=TRUE)
 v <- torch_tensor(c(-1, -1, -1, -1, -1, 1, 1, 1, 1, 1))
 
-gradient <- grad(h(u, v), u)
+y <- h(u, v)
+y$backward()
 
+u$grad
 ```
 
+Yes, the answer does match what was expected
 
 ---
 
@@ -188,7 +193,10 @@ f <- function(z) {
 
 z <- torch_tensor(-3.5, requires_grad = TRUE)
 
-eval <- grad(f(z), z)
+y <- f(z)
+
+y$backward()
+z$grad
 
 
 ```
@@ -201,9 +209,41 @@ eval <- grad(f(z), z)
 
 For the same function $f$, initialize $z[1] = -3.5$, and perform $n=100$ iterations of **gradient descent**, i.e., 
 
-> $z[{k+1}] = z[k] - \eta f'(z[k]) \ \ \ \ $ for $k = 1, 2, \dots, 100$
+$z[{k+1}] = z[k] - \eta f'(z[k]) \ \ \ \ $ for $k = 1, 2, \dots, 100$
+
+
+```{R}
+n <- 100
+z <- -3.5
+lr <- 0.02
+zvals <- c(z)
+
+for (i in 1:n) {
+  df <- 4*z^3 - 12*z - 3
+  z <- z - lr * df
+  
+  zvals <- c(zvals, z)
+}
+```
+
 
 Plot the curve $f$ and add taking $\eta = 0.02$, add the points $\{z_0, z_1, z_2, \dots z_{100}\}$ obtained using gradient descent to the plot. What do you observe?
+
+```{R}
+xvals <- seq(-4, 4, by = 0.01)
+yvals <- f(xvals)
+df_f <- data.frame(x = xvals, y = yvals)
+df_z <- data.frame(x = zvals, y = f(zvals))
+
+ggplot() +
+  geom_line(data = df_f, aes(x=x, y=y), color = "blue", size = 1) +
+  geom_point(data = df_z, aes(x=x, y=y), color = "red", size = 3) +
+  ggtitle("Gradient Descent for f(z)") +
+  xlab("z") +
+  ylab("f(z)")
+```
+
+I can observe that gradient descent is not properly converging at the global minimum. This is most likely stemming from the learning rate.
 
 ---
 
@@ -212,8 +252,33 @@ Plot the curve $f$ and add taking $\eta = 0.02$, add the points $\{z_0, z_1, z_2
 
 Redo the same analysis as **Question 1.4**, but this time using $\eta = 0.03$. What do you observe? What can you conclude from this analysis
 
+```{R}
+n <- 100
+z <- -3.5
+lr <- 0.03
+zvals <- c(z)
 
+for (i in 1:n) {
+  df <- 4*z^3 - 12*z - 3
+  z <- z - lr * df
+  
+  zvals <- c(zvals, z)
+}
 
+xvals <- seq(-4, 4, by = 0.01)
+yvals <- f(xvals)
+df_f <- data.frame(x = xvals, y = yvals)
+df_z <- data.frame(x = zvals, y = f(zvals))
+
+ggplot() +
+  geom_line(data = df_f, aes(x=x, y=y), color = "blue", size = 1) +
+  geom_point(data = df_z, aes(x=x, y=y), color = "red", size = 3) +
+  ggtitle("Gradient Descent for f(z)") +
+  xlab("z") +
+  ylab("f(z)")
+```
+
+I can observe that the gradient descent converges at the global minimum instead of a suboptimal local minimum. I can conclude that one must use the optimal learning rate in order for gradient descent to properly converge at the global minimum of a non-convex function.
 
 <br><br><br><br>
 <br><br><br><br>
@@ -244,6 +309,8 @@ df <-
   df %>%
   mutate(Survived = as.factor(Survived),
          Sex = as.factor(Sex),
+         # converting Pclass to factor because it is the passenger class
+         # therefore it is categorical and must be converted
          Pclass = as.factor(Pclass)) %>%
   rename("y" = Survived)
 
@@ -343,7 +410,8 @@ overview <- function(predicted, expected){
                                                       total_true_negatives)
     false_negative_rate <- total_false_negatives / (total_false_negatives + 
                                                       total_true_positives)
-    accuracy <- (total_true_positives + total_true_negatives) / length(predicted)
+    accuracy <- (total_true_positives + total_true_negatives) / 
+      length(predicted)
     error <- 1- accuracy
     return(
         data.frame(
@@ -447,6 +515,17 @@ ggplot(data = lasso_fit$results, aes(x = log2(lambda), y = Accuracy)) +
 ```
 
 
+```{R}
+# creating optmal lambda variable
+optimal_lambda <- lasso_fit$results$lambda[which.max(lasso_fit$results$Accuracy)]
+optimal_accuracy <- max(lasso_fit$results$Accuracy)
+
+paste0("The optimal lambda is ", optimal_lambda)
+paste0("The optimal accuracy is ", optimal_accuracy)
+```
+
+
+
 ---
 
 ###### 3.5  (25 points)
@@ -501,7 +580,7 @@ Initialize an optimizer using `optim_adam()` and perform $n=1000$ steps of gradi
 
 ```{R}
 f <- logistic()
-optimizer <- optim_adam(f$parameters, lr = 0.0005)
+optimizer <- optim_adam(f$parameters, lr = 0.0001)
 
 n <- 1000
 
@@ -555,6 +634,8 @@ all_overviews <-
 all_overviews
 
 ```
+
+It seems that the backwards-stepwise logistic regression had the highest accuracy by a slight margin. Although it had the highest accuracy stepwise regression is not the wisest choice to use on massive datasets due to the shear computation intensity required to slowly reduce AIC through its method of feature selection. The full overview and lasso overview had similar accuracies and errors although using LASSO regression is much more reliable for very large datasets. The torch overview had the lowest accuracy due to its dependancy on an effective learning rate which can make it at times unreliable.
 
 
 :::{.hidden unless-format="pdf"}
