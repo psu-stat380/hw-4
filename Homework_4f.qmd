@@ -1,0 +1,425 @@
+---
+title: "Homework 4 Final"
+author: "Lekh Shetty"
+format: html
+editor: visual
+---
+
+[Link to the Github repository](https://github.com/psu-stat380/hw-4)
+
+------------------------------------------------------------------------
+
+::: {.callout-important style="font-size: 0.8em;"}
+## Due: Sun, Apr 2, 2023 \@ 11:59pm
+
+Please read the instructions carefully before submitting your assignment.
+
+1.  This assignment requires you to only upload a `PDF` file on Canvas
+2.  Don't collapse any code cells before submitting.
+3.  Remember to make sure all your code output is rendered properly before uploading your submission.
+
+Please add your name to the author information in the frontmatter before submitting your assignment
+:::
+
+We will be using the following libraries:
+
+```{r}
+packages <- c(
+  "dplyr", 
+  "readr", 
+  "tidyr",
+  "tidyverse",
+  "purrr", 
+  "stringr", 
+  "corrplot", 
+  "car", 
+  "caret", 
+  "torch", 
+  "nnet", 
+  "broom"
+)
+
+#renv::install(packages)
+sapply(packages, require, character.only=T)
+```
+
+## <br><br><br><br>
+
+## Question 1
+
+::: callout-tip
+## 30 points
+
+Automatic differentiation using `torch`
+:::
+
+###### 1.1 (5 points)
+
+Consider $g(x, y)$ given by $$
+g(x, y) = (x - 3)^2 + (y - 4)^2.
+$$
+
+Using elementary calculus derive the expressions for
+
+$$
+\frac{d}{dx}g(x, y), \quad \text{and} \quad \frac{d}{dy}g(x, y).
+$$ Using your answer from above, what is the answer to $$
+\frac{d}{dx}g(x, y) \Bigg|_{(x=3, y=4)} \quad \text{and} \quad \frac{d}{dy}g(x, y) \Bigg|_{(x=3, y=4)} ?
+$$ Define $g(x, y)$ as a function in R, compute the gradient of $g(x, y)$ with respect to $x=3$ and $y=4$. Does the answer match what you expected?
+
+```{r}
+x_tensor <- torch_tensor(3, requires_grad = TRUE)
+y_tensor <- torch_tensor(4, requires_grad = TRUE)
+
+result <- torch_sum((x_tensor - 3)^2 + (y_tensor - 4)^2)
+
+result$backward()
+
+x_tensor$grad
+y_tensor$grad
+```
+
+As seen from the above calculations the values of d/dx and d/dy equal to 0, as expected if we were to calculate the gradients ourselves
+
+------------------------------------------------------------------------
+
+###### 1.2 (10 points)
+
+------------------------------------------------------------------------
+
+###### 1.3 (5 points)
+
+Define $f(z)$ as a function in R, and using the `torch` library compute $f'(-3.5)$.
+
+```{r}
+#library(torch)
+
+f <- function(z) {
+  return (z^4 - 6*z^2 - 3*z + 4)
+}
+```
+
+```{r}
+z <- torch_tensor(-3.5, requires_grad=TRUE)
+output <- f(z)
+output$backward()
+z$grad
+```
+
+------------------------------------------------------------------------
+
+###### 1.4 (5 points)
+
+For the same function $f$, initialize $z[1] = -3.5$, and perform $n=100$ iterations of **gradient descent**, i.e.,
+
+> \$z\[{k+1}\] = z\[k\] - \\eta f'(z\[k\]) \\ \\ \\ \\ \$ for $k = 1, 2, \dots, 100$
+
+Plot the curve $f$ and add taking $\eta = 0.02$, add the points $\{z_0, z_1, z_2, \dots z_{100}\}$ obtained using gradient descent to the plot. What do you observe?
+
+```{r}
+f <- function(z) {
+  return (z^4 - 6*z^2 - 3*z + 4)
+}
+
+z <- torch_tensor(-3.5, requires_grad=TRUE)
+eta <- 0.02
+z_list <- list(z$detach())
+for (i in 1:100) {
+  output <- f(z)
+  output$backward()
+  z$detach_()
+  z = eta * z$grad
+  z$requires_grad_()
+  z_list[[i+1]] <- z$detach()
+}
+
+z_vals <- unlist(lapply(z_list, function(x) as.numeric(x)))
+f_vals <- unlist(lapply(z_list, function(x) f(x)$item()))
+df <- data.frame(z=z_vals, f=f_vals)
+
+ggplot(data=df, aes(x=z, y=f)) + 
+  geom_line() +
+  geom_point(data=df, aes(x=z, y=f), color="red") +
+  ggtitle("Gradient Descent for f(z)") +
+  xlab("z") +
+  ylab("f(z)")
+
+```
+
+------------------------------------------------------------------------
+
+###### 1.5 (5 points)
+
+Redo the same analysis as **Question 1.4**, but this time using $\eta = 0.03$. What do you observe? What can you conclude from this analysis
+
+```{r}
+f <- function(z) {
+  return (z^4 - 6*z^2 - 3*z + 4)
+}
+
+z <- torch_tensor(-3.5, requires_grad=TRUE)
+eta <- 0.03
+z_list <- list(z$detach())
+for (i in 1:100) {
+  output <- f(z)
+  output$backward()
+  z$detach_()
+  z = eta * z$grad
+  z$requires_grad_()
+  z_list[[i+1]] <- z$detach()
+}
+
+z_vals <- unlist(lapply(z_list, function(x) as.numeric(x)))
+f_vals <- unlist(lapply(z_list, function(x) f(x)$item()))
+df <- data.frame(z=z_vals, f=f_vals)
+
+ggplot(data=df, aes(x=z, y=f)) + 
+  geom_line() +
+  geom_point(data=df, aes(x=z, y=f), color="red") +
+  ggtitle("Gradient Descent for f(z)") +
+  xlab("z") +
+  ylab("f(z)")
+```
+
+<br><br><br><br> <br><br><br><br> ---
+
+## Question 2
+
+::: callout-tip
+## 50 points
+
+Logistic regression and interpretation of effect sizes
+:::
+
+For this question we will use the **Titanic** dataset from the Stanford data archive. This dataset contains information about passengers aboard the Titanic and whether or not they survived.
+
+------------------------------------------------------------------------
+
+###### 2.1 (5 points)
+
+Read the data from the following URL as a tibble in R. Preprocess the data such that the variables are of the right data type, e.g., binary variables are encoded as factors, and convert all column names to lower case for consistency. Let's also rename the response variable `Survival` to `y` for convenience.
+
+```{r}
+url <- "https://web.stanford.edu/class/archive/cs/cs109/cs109.1166/stuff/titanic.csv"
+
+df <- read_csv(url, col_types = cols(
+  Survived = col_factor(),
+  Pclass = col_factor(),
+  Name = col_character(),
+  Sex = col_factor(),
+  Age = col_double(),
+  Siblings = col_double(),
+  Parents = col_double(),
+  Fare = col_double()
+))
+
+colnames(df)[1]  <- "y"
+colnames(df)[6]  <- "Siblings"
+colnames(df)[7]  <- "Parents"
+
+df$Sex<-ifelse(df$Sex=="male",1,0)
+
+
+names(df) <- tolower(names(df))
+
+df
+#head(df)
+summary(df)
+```
+
+------------------------------------------------------------------------
+
+###### 2.2 (5 points)
+
+Visualize the correlation matrix of all numeric columns in `df` using `corrplot()`
+
+```{r}
+library(corrplot)
+
+df %>% 
+  select_if(is.numeric) %>% 
+  cor() %>% 
+  corrplot()
+```
+
+------------------------------------------------------------------------
+
+###### 2.3 (10 points)
+
+Fit a logistic regression model to predict the probability of surviving the titanic as a function of:
+
+-   `pclass`
+-   `sex`
+-   `age`
+-   `fare`
+-   `# siblings`
+-   `# parents`
+
+```{r}
+full_model <- glm(y ~ pclass + sex + age + fare + siblings + parents, data = df, family = binomial())
+summary(full_model)
+
+```
+
+------------------------------------------------------------------------
+
+###### 2.4 (30 points)
+
+Provide an interpretation for the slope and intercept terms estimated in `full_model` in terms of the log-odds of survival in the titanic and in terms of the odds-ratio (if the covariate is also categorical).
+
+::: callout-hint
+## 
+
+Recall the definition of logistic regression from the lecture notes, and also recall how we interpreted the slope in the linear regression model (particularly when the covariate was categorical).
+:::
+
+```{r}
+print("The intercept term: if a passenger is a male in third class with no siblings, no parents, age zero, and fare zero, then the model estimates that the log-odds of survival would be 1.759755. The coefficient for sex, -2.756710, indicates that holding all other variables constant, females have a higher log-odds of survival than males.Tthe coefficient for pclass1, 2.350022, indicates that passengers in first class have higher log-odds of survival than passengers in second or third class. The coefficient for age, -0.043410, indicates that older passengers have slightly lower log-odds of survival than younger passengers.The coefficient for siblings, -0.401572, indicates that passengers with more siblings on board have lower log-odds of survival.The coefficient for parents, -0.106884, is not statistically significant at the alpha = 0.05, so not enough sufficient evidence to say there is a relationship between the number of parents on board and the log-odds of survival.")
+```
+
+<br><br><br><br> <br><br><br><br> ---
+
+## Question 3
+
+::: callout-tip
+## 70 points
+
+Variable selection and logistic regression in `torch`
+:::
+
+------------------------------------------------------------------------
+
+###### 3.1 (15 points)
+
+Complete the following function `overview` which takes in two categorical vectors (`predicted` and `expected`) and outputs:
+
+-   The prediction accuracy
+-   The prediction error
+-   The false positive rate, and
+-   The false negative rate
+
+```{R}
+overview <- function(predicted, expected){
+    accuracy <- sum(predicted == expected) / length(expected)
+    error <- 1 - accuracy
+    total_false_positives <- sum(predicted == 1 & expected == 0)
+    total_true_positives <- sum(predicted == 1 & expected == 1)
+    total_false_negatives <- sum(predicted == 0 & expected == 1)
+    total_true_negatives <- sum(predicted == 0 & expected == 0)
+    false_positive_rate <- total_false_positives / (total_false_positives + total_true_negatives)
+    false_negative_rate <- total_false_negatives / (total_false_negatives + total_true_positives)
+    return(
+        data.frame(
+            accuracy = accuracy, 
+            error=error, 
+            false_positive_rate = false_positive_rate, 
+            false_negative_rate = false_negative_rate
+        )
+    )
+}
+
+```
+
+You can check if your function is doing what it's supposed to do by evaluating
+
+```{r}
+overview(df$y, df$y)
+```
+
+## and making sure that the accuracy is $100\%$ while the errors are $0\%$.
+
+###### 3.2 (5 points)
+
+```{r}
+full_model_prob <- predict(full_model, type="response")
+full_model_pred <- ifelse(full_model_prob >= 0.5, 1, 0)
+
+full_model_overview <- overview(full_model_prob, df$y)
+full_model_overview
+```
+
+------------------------------------------------------------------------
+
+###### 3.3 (5 points)
+
+Using backward-stepwise logistic regression, find a parsimonious alternative to `full_model`, and print its `overview`
+
+```{r}
+step_model <- step(full_model, direction = "backward",scope=formula(full_model)) # Insert your code here. 
+summary(step_model)
+```
+
+```{r}
+step_predictions <-  predict(step_model, type = "response")
+step_predictions <- ifelse(step_predictions >= 0.5, 1, 0)
+
+overview(step_predictions, df$y)
+```
+
+------------------------------------------------------------------------
+
+###### 3.4 (15 points)
+
+Using the `caret` package, setup a $5$-fold cross-validation training method using the `caret::trainConrol()` function
+
+```{r}
+controls <- trainControl(method="cv", number=5) #insert your code here
+```
+
+Now, using `control`, perform $5$-fold cross validation using `caret::train()` to select the optimal $\lambda$ parameter for LASSO with logistic regression.
+
+Take the search grid for $\lambda$ to be in $\{ 2^{-20}, 2^{-19.5}, 2^{-19}, \dots, 2^{-0.5}, 2^{0} \}$.
+
+```{r}
+# Insert your code in the ... region
+library(glmnet)
+
+X <- model.matrix(y ~ ., data = df)
+y <- df$y
+
+lasso_fit <- train(
+  x = X,
+  y = y,
+  method = "glmnet",
+  trControl = controls, 
+  tuneGrid = expand.grid(
+    alpha = 1,
+    lambda = 2^seq(-20, 0, by = 0.5)
+    ),
+  family = "binomial"
+)
+```
+
+Using the information stored in `lasso_fit$results`, plot the results for cross-validation accuracy vs. $log_2(\lambda)$. Choose the optimal $\lambda^*$, and report your results for this value of $\lambda^*$.
+
+```{R}
+library(ggplot2)
+
+ggplot(data = lasso_fit$results, aes(x = log2(lambda), y = Accuracy)) + 
+  geom_line() + 
+  geom_point() +
+  scale_x_continuous(breaks = seq(-20, 0, by = 2)) +
+  labs(title = "Cross-validation accuracy vs log2(lambda)", x = "log2(lambda)", y = "Accuracy")
+```
+
+---
+###### 3.5  (25 points)
+---
+
+###### 3.6 (5 points)
+
+Create a summary table of the `overview()` summary statistics for each of the $4$ models we have looked at in this assignment, and comment on their relative strengths and drawbacks.
+
+::: {.hidden unless-format="pdf"}
+\pagebreak
+:::
+
+<br><br><br><br> <br><br><br><br> ---
+
+::: {.callout-note collapse="true"} \## Session Information
+
+Print your `R` session information using the following command
+
+```{R}
+sessionInfo()
+```
