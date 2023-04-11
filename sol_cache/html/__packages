@@ -1,0 +1,15 @@
+dplyr
+readr
+tidyr
+purrr
+stringr
+corrplot
+carData
+car
+ggplot2
+lattice
+caret
+torch
+nnet
+broom
+report
